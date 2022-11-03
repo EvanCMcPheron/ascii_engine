@@ -8,6 +8,16 @@ pub trait Behaviour {
     fn constructor(&mut self, entity: &mut Entity) -> ();
     fn process(&mut self, entity: &mut Entity) -> ();
     fn deconstructor(&mut self, entity: &mut Entity) -> ();
+    fn c(&mut self, entity: &mut Entity) -> Result<()> {
+        let mut twin = entity.twin();
+        let mut soul = twin.soul_mut()?;
+        for child in soul.children_mut().iter_mut() {
+            let mut twin = child.twin();
+            child.soul_mut()?.behaviour_mut().c(&mut twin)?;
+        }
+        soul.behaviour_mut().constructor(entity);
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -54,7 +64,6 @@ impl Entity {
                                     }
                                 },
                             );
-                            println!("Childs indx in parent: {:?}", indx);
                             if let Some(i) = indx {
                                 (*parent_soul).children_mut().remove(i);
                             }
@@ -83,6 +92,14 @@ impl Entity {
             Err(_) => bail!("Could not mutibly borrow soul, it is already borrowed"),
         }
     }
+    pub fn remove_child(&mut self, child: &mut Entity) -> Result<()> {
+        if let Some(_) = self.get_child_indx(&child) {
+            child.orphan()?;
+            Ok(())
+        } else {
+            bail!("Could not find child.");
+        }
+    }
     pub fn get_child_indx(&self, child: &Entity) -> Option<usize> {
         match self.soul() {
             Ok(soul) => soul
@@ -103,19 +120,23 @@ impl Entity {
         &self.soul
     }
 }
+impl PartialEq for Entity {
+    fn eq(&self, other: &Self) -> bool {
+        self.soul_ref().as_ptr() == other.soul_ref().as_ptr()
+    }
+}
 
 #[derive(Getters, MutGetters)]
 pub struct Soul {
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     position: (i32, i32),
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     sprite: Sprite,
-    ///RefCells to ensure interior mutibility. Only None if parent is this entity is the child of the app.
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     parent: Option<Entity>,
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     children: Vec<Entity>,
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     behaviour: Box<dyn Behaviour>,
 }
 
