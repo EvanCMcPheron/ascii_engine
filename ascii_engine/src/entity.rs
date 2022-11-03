@@ -5,9 +5,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub trait Behaviour {
-    fn constructor(&mut self, entity: &mut Entity) -> Result<()>;
-    fn process(&mut self, entity: &mut Entity) -> Result<()>;
-    fn deconstructor(&mut self, entity: &mut Entity) -> Result<()>;
+    fn constructor(&mut self, entity: &mut Entity) -> ();
+    fn process(&mut self, entity: &mut Entity) -> ();
+    fn deconstructor(&mut self, entity: &mut Entity) -> ();
 }
 
 #[derive(Debug)]
@@ -139,5 +139,47 @@ impl std::fmt::Debug for Soul {
             .field("parent", &"Hidden Value")
             .field("children", &self.children)
             .finish()
+    }
+}
+
+
+pub struct Brain<C, P, D> 
+  where 
+    C: Fn(&mut Entity) -> (),
+    P: Fn(&mut Entity) -> (),
+    D: Fn(&mut Entity) -> (),
+{
+    constructor: C,
+    process: P,
+    deconstructor: D
+}
+impl<C, P, D> Brain<C, P, D> 
+  where 
+    C: Fn(&mut Entity) -> (),
+    P: Fn(&mut Entity) -> (),
+    D: Fn(&mut Entity) -> (),
+{
+    pub fn new(constructor: C, process: P, deconstructor: D) -> Brain<C, P, D> {
+        Brain::<C, P, D> {
+            constructor,
+            process,
+            deconstructor,
+        }
+    }
+}
+impl<C, P, D> Behaviour for Brain<C, P, D> 
+  where 
+    C: Fn(&mut Entity) -> (),
+    P: Fn(&mut Entity) -> (),
+    D: Fn(&mut Entity) -> (),
+{
+    fn constructor(&mut self, entity: &mut Entity) -> () {
+        (self.constructor)(entity);
+    }
+    fn process(&mut self, entity: &mut Entity) -> () {
+        (self.process)(entity);
+    }
+    fn deconstructor(&mut self, entity: &mut Entity) -> () {
+        (self.deconstructor)(entity);
     }
 }
