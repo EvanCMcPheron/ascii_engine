@@ -16,5 +16,6 @@ impl Behaviour for ExampleType {
 fn main() {
     let brain = ExampleType();
     let entity = Entity::new(Box::new(brain), (0, 0), Sprite::default());
+    entity.orphan();
     println!("{:?}", entity);
 }
