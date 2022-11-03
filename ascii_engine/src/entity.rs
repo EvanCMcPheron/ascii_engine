@@ -5,14 +5,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub trait Behaviour {
-    fn constructor(&mut self, entity: &mut Entity) -> ();
-    fn process(&mut self, entity: &mut Entity) -> ();
-    fn deconstructor(&mut self, entity: &mut Entity) -> ();
+    fn constructor(&mut self, entity: &mut Entity) -> Result<()>;
+    fn process(&mut self, entity: &mut Entity) -> Result<()>;
+    fn deconstructor(&mut self, entity: &mut Entity) -> Result<()>;
 }
 
-#[derive(Debug, Getters)]
+#[derive(Debug)]
 pub struct Entity {
-    #[getset(get)]
     soul: Rc<RefCell<Soul>>,
 }
 
@@ -22,8 +21,14 @@ impl Entity {
             soul: Rc::new(RefCell::new(Soul::new(behaviour, position, sprite))),
         }
     }
-    pub fn soul(&self) -> Result<Soul> {
+    pub fn soul(&self) -> Result<std::cell::Ref<Soul>> {
         match self.soul.try_borrow() {
+            Ok(r) => Ok(r),
+            Err(_) => bail!("Could not borrow soul, it is already mutibly borrowed."),
+        }
+    }
+    pub fn soul_mut(&mut self) -> Result<std::cell::RefMut<Soul>> {
+        match self.soul.try_borrow_mut() {
             Ok(r) => Ok(r),
             Err(_) => bail!("Could not borrow soul, it is already mutibly borrowed."),
         }
@@ -33,7 +38,7 @@ impl Entity {
             soul: Rc::clone(&self.soul),
         }
     }
-    pub fn orphan(&self) -> Result<()> {
+    pub fn orphan(&mut self) -> Result<()> {
         match self.soul.try_borrow_mut() {
             Ok(mut soul) => {
                 match &mut (*soul).parent {
@@ -54,7 +59,9 @@ impl Entity {
                                 (*parent_soul).children_mut().remove(i);
                             }
                         }
-                        Err(_) => bail!("Could not mutibly borrow parent's soul, it is already borrowed"),
+                        Err(_) => {
+                            bail!("Could not mutibly borrow parent's soul, it is already borrowed")
+                        }
                     },
                     None => (),
                 }
@@ -64,7 +71,7 @@ impl Entity {
             Err(_) => bail!("Could not mutibly borrow soul, it is already borrowed"),
         }
     }
-    pub fn add_child(&self, child: &Entity) -> Result<()> {
+    pub fn add_child(&mut self, child: &mut Entity) -> Result<()> {
         child.orphan()?; //Garentees that souls will only exist at a single location in the tree
         let new_ent = child.twin();
         (*new_ent.soul.borrow_mut()).parent = Some(self.twin());
@@ -75,6 +82,25 @@ impl Entity {
             }
             Err(_) => bail!("Could not mutibly borrow soul, it is already borrowed"),
         }
+    }
+    pub fn get_child_indx(&self, child: &Entity) -> Option<usize> {
+        match self.soul() {
+            Ok(soul) => soul
+                .children()
+                .iter()
+                .enumerate()
+                .fold(None, |accum, (i, ent)| {
+                    if ent.soul_ref().as_ptr() == child.soul_ref().as_ptr() {
+                        Some(i)
+                    } else {
+                        accum
+                    }
+                }),
+            Err(_) => None,
+        }
+    }
+    pub fn soul_ref(&self) -> &Rc<RefCell<Soul>> {
+        &self.soul
     }
 }
 
